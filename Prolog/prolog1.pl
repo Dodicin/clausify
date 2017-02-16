@@ -30,7 +30,7 @@ rew(not(implies(A, B)), Univars, F) :-
 rew(not(every(X, B)), Univars, F) :- rew(exist(X, not(B)), Univars, F).
 rew(not(exist(X, B)), Univars, F) :- rew(every(X, not(B)), Univars, F).
 
-%Standardize variables
+% 	Standardize variables
 
 % Move quantifiers outwards 
 rew(and(every(X, A), B), Univars, F) :-  rew(every(X, and(A, B)), Univars, F).
@@ -46,10 +46,12 @@ rew(or(exist(X, A), B), Univars, F) :-  rew(exist(X, or(A, B)), Univars, F).
 rew(or(B, exist(X, A)), Univars, F) :-  rew(exist(X, or(A, B)), Univars, F).
 
 % Skolemize quantifiers
-rew(every(X, B), Univars, F) :-  rew(B, [X|Univars], F).
+rew(every(X, B), Univars, F) :-  append(Univars, [X], NewUnivars), rew(B, NewUnivars, F).
 
+rew(exist(X, B), [], F) :- skolem_function(X, SK),
+	X = SK, rew(B, [], F).
 rew(exist(X, B), Univars, F) :- skolem_function(Univars, SK),
-	replace(X, SK, B, B1), rew(B1, Univars, F).
+	X = SK, rew(B, Univars, F).
 
 % Rewrite the internal nodes of the formula
 rew(and(A, B), Univars, and(A1, B1)) :- rew(A, Univars, A1), 
@@ -60,19 +62,19 @@ rew(or(A, B), Univars, or(A1, B1)) :- rew(A, Univars, A1),
 % Base case
 rew(A, _, A). 
 
-% Distributivity law
+% Distributivity law %% Need to rework
+dist(or(and(X, Y), Z), and(or(X, Z), or(Y, Z))) :- !.
+dist(or(Z, and(X, Y)), and(or(X, Z), or(Y, Z))) :- !.
+
+% Binary AND/OR to n-ary
+
+% CNF Converter
+tocnf(FBF, CNFFBF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF).
 
 % ----- Utilities
-% Replaces instances of A with B from Initial expression to Final expression
-replace(A, B, A, B) :- !.
-replace(A, B, X, Y) :- X=..[_|ArgsX], Y=..[_|ArgsY], 
-	foreach(member(ArgsX, Xelem), replace(A, B, Xelem, Yelem)). 
-	%%^^ Needs to repeat replace recursively for both arguments of X and Y to get to base case
-
 % Generate skolem constants or functions
-
 skolem_variable(V, SK) :- var(V), gensym(skv, SK).
-skolem_function([], SF) :- skolem_var(_, SF).
+skolem_function([], SF) :- skolem_variable(_, SF), !.
 skolem_function([A | ARGS], SF) :-
 	gensym(skf, SF_op),
 	SF =.. [SF_op, A | ARGS].
