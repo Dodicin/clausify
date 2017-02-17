@@ -1,37 +1,176 @@
 %%%% 808292 Habbash Nassim
 
+% ---- Input control
+is_reserved(A) :- subset([A], [and, or, not, implies, every, exist]).
+
 is_term(A) :- var(A), !.
-is_term(A) :- is_const(A), !.
-is_term(A) :- is_funct(A), !.
+is_term(A) :- atomic(A), not(is_reserved(A)), !.
 
-is_const(A) :- number(A), !.
-is_const(A) :- atom_chars(A, [H|_]), char_type(H, lower).
+is_term(A) :- 	A =.. [Name|List], not(is_reserved(Name)), 
+				foreach(member(L, List), is_term(L)), !.
 
+is_wff(A) :- is_term(A), !.
+is_wff(not(A)) :- is_wff(A), !.
+is_wff(and(A, B)) :- is_wff(A), is_wff(B), !.
+is_wff(or(A, B)) :- is_wff(A), is_wff(B), !.
+is_wff(implies(A, B)) :- is_wff(A), is_wff(B), !.
+is_wff(exist(A, B)) :- var(A), is_wff(B), !.
+is_wff(every(A, B)) :- var(A), is_wff(B), !.
 
-is_funct(A) :- term_to_atom(A, X), atom_chars(X, L), phrase(expr, L).
+% ---- Rewrite rules for conversion of generic FOL formula to CNF
 
+%% Implication in terms of or
+rew(implies(A, B), Univars, F) :- rew(or(not(A), B), Univars, F), !.
 
-% DCG for parsing functions and predicates with n arity
-expr -->  fsign, ['('], terms, [')'].
-fsign --> {is_const(A)}, [A].
-terms --> term.
-terms --> expr.
-terms --> terms, term.
-term --> {is_term(T)}, [T].
+%% Negation inwards
+rew(not(not(A)), Univars, F) :- rew(A, Univars, F), !.
+rew(not(and(A, B)), Univars, F) :- rew(or(not(A),not(B)), Univars, F), !.
+rew(not(or(A, B)), Univars, F) :- rew(and(not(A), not(B)), Univars, F), !.
+rew(not(implies(A, B)), Univars, F) :- 
+								rew(implies(not(A), not(B)), Univars, F), !.
+rew(not(every(X, B)), Univars, F) :- rew(exist(X, not(B)), Univars, F), !.
+rew(not(exist(X, B)), Univars, F) :- rew(every(X, not(B)), Univars, F), !.
 
-function --> symbol, "(", termlist, ")".
-termlist --> term | term, ",", termlist.
-term    --> symbol | function.
-symbol    --> [C], { char_type(C, alpha); var(C) }, symbolbody.
-symbolbody --> [C], { char_type(C, alnum) ; C = '_' ; C = '-' }, symbolbody.
-symbolbody --> [].
+%% Standardize variables
 
+%% Move quantifiers outwards 
+rew(and(every(X, A), B), Univars, F) :- rew(every(X, and(A, B)), Univars, F), 
+										!.
+rew(and(B, every(X, A)), Univars, F) :- rew(every(X, and(A, B)), Univars, F), 
+										!.
+rew(and(exist(X, A), B), Univars, F) :- rew(exist(X, and(A, B)), Univars, F), 
+										!.
+rew(and(B, exist(X, A)), Univars, F) :- rew(exist(X, and(A, B)), Univars, F), 
+										!.
+rew(or(every(X, A), B), Univars, F) :- rew(every(X, or(A, B)), Univars, F), 
+										!.
+rew(or(B, every(X, A)), Univars, F) :- rew(every(X, or(A, B)), Univars, F), 
+										!.
+rew(or(exist(X, A), B), Univars, F) :- rew(exist(X, or(A, B)), Univars, F), 
+										!.
+rew(or(B, exist(X, A)), Univars, F) :- rew(exist(X, or(A, B)), Univars, F), 
+										!.
 
-%% is_wff controls if the to-be-parsed formula is a well formed formula.
+%% Skolemize quantifiers
+rew(every(X, B), Univars, F) :- append(Univars, [X], NewUnivars), 
+								rew(B, NewUnivars, F), !.
+rew(exist(X, B), [], F) :- 		skolem_function(X, SK),
+								X = SK, rew(B, [], F), !.
+rew(exist(X, B), Univars, F) :- skolem_function(Univars, SK),
+								X = SK, rew(B, Univars, F), !.
 
-is_wff(not(A)) :- is_wff(A).
-is_wff(and(A, B)) :- is_wff(A), is_wff(B).
-is_wff(or(A, B)) :- is_wff(A), is_wff(B).
-is_wff(implies(A, B)) :- is_wff(A), is_wff(B).
-is_wff(every(A, B)) :- var(A), is_wff(B).
-is_wff(exist(A, B)) :- var(A), is_wff(B).
+%% Rewrite the internal nodes of the formula
+rew(and(A, B), Univars, and(A1, B1)) :- rew(A, Univars, A1), 
+										rew(B, Univars, B1), !.
+rew(or(A, B), Univars, or(A1, B1)) :- 	rew(A, Univars, A1), 
+										rew(B, Univars, B1), !.
+
+%% Base case
+rew(A, _, A) :- !. 
+
+% Distributivity law
+dist(or(and(X, Y), Z), and(or(X, Z), or(Y, Z))).
+dist(or(Z, and(X, Y)), and(or(X, Z), or(Y, Z))).
+
+% Binary AND/OR to n-ary
+
+% Case X(a, b) => X(a, b)
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]),
+					is_term_or_neg(Arg1), is_term_or_neg(Arg2), B = A, !.
+
+% Case X(X(a, b), c) => X(a, b, c)
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	Arg1=..[Name|_], is_term_or_neg(Arg2),
+					simplify(Arg1, C), C=..[_|ArgsC], 
+					append(ArgsC, [Arg2], ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(a, X(b, c)) => X(a, b, c)
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	is_term_or_neg(Arg1), Arg2=..[Name|_], 
+					simplify(Arg2, C), C=..[_|ArgsC],
+					append([Arg1], ArgsC, ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(Y(a, b), c) => X(Y(a, b), c)
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	Arg1=..[DifferentName|_], is_term_or_neg(Arg2),
+				   	Name \== DifferentName, subset([DifferentName], [or, and]),
+					simplify(Arg1, C), 
+					append([C], [Arg2], ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(a, Y(b, c)) => X(a, Y(b, c))
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	is_term_or_neg(Arg1), Arg2=..[DifferentName|_], 
+				   	Name \== DifferentName, subset([DifferentName], [or, and]),
+					simplify(Arg2, C),
+					append([Arg1], [C], ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(X(a, b), X(c, d)) => X(a, b, c, d)
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	Arg1=..[Name|_], Arg2=..[Name|_],
+					simplify(Arg1, C), simplify(Arg2, D),
+					C=..[_|ArgsC], D=..[_|ArgsD],
+					append(ArgsC, ArgsD, ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(X(a, b), Y(b, c)) => X(a, b, Y(b, c))				
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	Arg1=..[Name|_], Arg2=..[DifferentName|_], 
+				   	Name \== DifferentName,
+					simplify(Arg1, C), 
+					subset([DifferentName], [or, and]), simplify(Arg2, D),
+					C=..[_|ArgsC],
+					append(ArgsC, [D], ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(Y(a, b), X(c, d)) => X(Y(a, b), c, d)
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	Arg1=..[DifferentName|_], Arg2=..[Name|_], 
+					simplify(Arg2, C),
+					subset([DifferentName], [or, and]), simplify(Arg1, D),
+					C=..[_|ArgsC],
+					append([D], ArgsC, ArgsB),
+					B =.. [Name|ArgsB], !.
+
+% Case X(Y(a, b), Y(c, d)) => X(Y(a, b), Y(c, d))
+% This is the CNF form, it doesn't merge the functions, but just simplify inside. 
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+				   	Arg1=..[DifferentName|_], Arg2=..[DifferentName|_],
+					simplify(Arg1, C), simplify(Arg2, D),
+					append([C], [D], ArgsB),
+					B =.. [Name|ArgsB], !.
+
+is_term_or_neg(A) :- (is_term(A) ; A=..[not|_]), !.
+
+% CNF Converter
+tocnf(FBF, FCNF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF), simplify(CNFFBF, FCNF), !.
+tocnf(FBF, CNFFBF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF), !.
+tocnf(FBF, FCNF) :- is_wff(FBF), rew(FBF, _, SFBF), simplify(SFBF, FCNF), !.
+tocnf(FBF, SFBF) :- is_wff(FBF), rew(FBF, _, SFBF), !.
+
+% Horn check
+is_horn(A) :- tocnf(A, B), is_horn_cnf(B), !.
+is_horn_cnf(A) :- A=..[and|Clauses], is_horn_disj(Clauses), !.
+is_horn_cnf(A) :- is_horn_disj(A), !.
+
+is_horn_disj([]) :- !.
+is_horn_disj([H|T]) :- is_horn_clause(H), is_horn_disj(T), !.
+is_horn_disj(Clause) :- is_horn_clause(Clause).
+
+is_horn_clause(Clause) :- Clause=..[or|Literals], checkPos(Literals, N), N=<1, !.
+is_horn_clause(Term) :- is_term_or_neg(Term), checkPos([Term], N), N=<1, !.
+
+checkPos([], 0).
+checkPos([H|T], N) :- functor(H, Name, _), Name \= not, !, checkPos(T, N2), N is N2+1.
+checkPos([_|T], N) :- checkPos(T, N), !.
+
+% ----- Utilities
+% Generate skolem constants or functions
+skolem_variable(V, SK) :- var(V), gensym(skv, SK).
+skolem_function([], SF) :- skolem_variable(_, SF), !.
+skolem_function([A | ARGS], SF) :-
+	gensym(skf, SF_op),
+	SF =.. [SF_op, A | ARGS].
