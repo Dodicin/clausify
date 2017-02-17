@@ -18,10 +18,10 @@ is_wff(every(A, B)) :- var(A), is_wff(B).
 
 % ---- Rewrite rules for conversion of generic FOL formula to CNF
 
-% Implication in terms of or
+%% Implication in terms of or
 rew(implies(A, B), Univars, F) :- rew(or(not(A), B), Univars, F).
 
-% Negation inwards
+%% Negation inwards
 rew(not(not(A)), Univars, F) :- rew(A, Univars, F).
 rew(not(and(A, B)), Univars, F) :- rew(or(not(A),not(B)), Univars, F).
 rew(not(or(A, B)), Univars, F) :- rew(and(not(A), not(B)), Univars, F).
@@ -30,9 +30,9 @@ rew(not(implies(A, B)), Univars, F) :-
 rew(not(every(X, B)), Univars, F) :- rew(exist(X, not(B)), Univars, F).
 rew(not(exist(X, B)), Univars, F) :- rew(every(X, not(B)), Univars, F).
 
-% 	Standardize variables
+%% Standardize variables
 
-% Move quantifiers outwards 
+%% Move quantifiers outwards 
 rew(and(every(X, A), B), Univars, F) :-  rew(every(X, and(A, B)), Univars, F).
 rew(and(B, every(X, A)), Univars, F) :-  rew(every(X, and(A, B)), Univars, F).
 
@@ -45,7 +45,7 @@ rew(or(B, every(X, A)), Univars, F) :-  rew(every(X, or(A, B)), Univars, F).
 rew(or(exist(X, A), B), Univars, F) :-  rew(exist(X, or(A, B)), Univars, F).
 rew(or(B, exist(X, A)), Univars, F) :-  rew(exist(X, or(A, B)), Univars, F).
 
-% Skolemize quantifiers
+%% Skolemize quantifiers
 rew(every(X, B), Univars, F) :-  append(Univars, [X], NewUnivars), rew(B, NewUnivars, F).
 
 rew(exist(X, B), [], F) :- skolem_function(X, SK),
@@ -53,23 +53,63 @@ rew(exist(X, B), [], F) :- skolem_function(X, SK),
 rew(exist(X, B), Univars, F) :- skolem_function(Univars, SK),
 	X = SK, rew(B, Univars, F).
 
-% Rewrite the internal nodes of the formula
+%% Rewrite the internal nodes of the formula
 rew(and(A, B), Univars, and(A1, B1)) :- rew(A, Univars, A1), 
 	rew(B, Univars, B1).
 rew(or(A, B), Univars, or(A1, B1)) :- rew(A, Univars, A1), 
 	rew(B, Univars, B1).
 
-% Base case
+%% Base case
 rew(A, _, A). 
 
-% Distributivity law %% Need to rework
+% Distributivity law
 dist(or(and(X, Y), Z), and(or(X, Z), or(Y, Z))) :- !.
 dist(or(Z, and(X, Y)), and(or(X, Z), or(Y, Z))) :- !.
 
 % Binary AND/OR to n-ary
 
+
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+							not(compound(Arg1)), not(compound(Arg2)), B = A, !.
+
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+						   	Arg1=..[Name|_], not(compound(Arg2)),
+							simplify(Arg1, C), C=..[_|ArgsC], 
+							append(ArgsC, [Arg2], ArgsB),
+							B =.. [Name|ArgsB], !.
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+						   	not(compound(Arg1)), Arg2=..[Name|_], 
+							simplify(Arg2, C), C=..[_|ArgsC],
+							append([Arg1], ArgsC, ArgsB),
+							B =.. [Name|ArgsB], !.
+
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+						   	Arg1=..[Name|_], Arg2=..[Name|_],
+							simplify(Arg1, C), simplify(Arg2, D),
+							C=..[_|ArgsC], D=..[_|ArgsD],
+							append(ArgsC, ArgsD, ArgsB),
+							B =.. [Name|ArgsB], !.
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+						   	Arg1=..[Name|_], Arg2=..[DifferentName|_],
+							simplify(Arg1, C), 
+							subset([DifferentName], [or, and]), simplify(Arg2, D),
+							C=..[_|ArgsC], D=..[_|ArgsD],
+							append(ArgsC, ArgsD, ArgsB),
+							B =.. [Name|ArgsB], !.
+simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
+						   	Arg2=..[Name|_], Arg1=..[DifferentName|_],
+							simplify(Arg2, C),
+							subset([DifferentName], [or, and]), simplify(Arg1, D),
+							C=..[_|ArgsC], D=..[_|ArgsD],
+							append(ArgsC, ArgsD, ArgsB),
+							B =.. [Name|ArgsB], !.
+
+
+% Horn check
+
 % CNF Converter
-tocnf(FBF, CNFFBF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF).
+
+tocnf(FBF, FCNF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF), simplify(CNFFBF, FCNF, and).
 
 % ----- Utilities
 % Generate skolem constants or functions
