@@ -33,14 +33,15 @@ checkPos([H|T], N) :- functor(H, Name, _), Name \= not, !,
 checkPos([_|T], N) :- checkPos(T, N), !.
 
 %
-% ---- Formula control
+% ---- Formula validity control
 %
 
 is_reserved(A) :- subset([A], [and, or, not, implies, every, exist]).
 
 is_term(A) :- var(A), !.
 is_term(A) :- atomic(A), not(is_reserved(A)), !.
-is_term(A) :- A =.. [Name|List], not(is_reserved(Name)), 
+is_term(A) :- compound_name_arity(A, _, Arity), Arity > 0, 
+		A =.. [Name|List], not(is_reserved(Name)), 
 		foreach(member(L, List), is_term(L)), !.
 
 is_wff(A) :- is_term(A), !.
