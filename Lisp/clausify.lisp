@@ -115,7 +115,7 @@
 				      (list 'not (third (second f)))) univars))
 		(T f)))
 
-;; Skolemize universal quantifier
+;; Drop universal quantifier
 (defun rew-every (f &optional univars)
 	(rew (third f) (append univars (list (second f)))))
 
