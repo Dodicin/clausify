@@ -1,5 +1,7 @@
 # clausify - Lisp
 
+# Author: Habbash Nassim (808292)
+
 # Description
 
 This Lisp library is a set of functions designed to parse first order logic (FOL) formulas, convert them into conjunctive normal form (CNF) and check whether a formula is a Horn clause.

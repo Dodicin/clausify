@@ -1,5 +1,7 @@
 # clausify - Prolog
 
+# Author: Habbash Nassim (808292)
+
 # Description
 
 This Prolog library is a set of predicates and functions designed to parse first order logic (FOL) formulas, convert them into conjunctive normal form (CNF) and check whether a formula is a Horn clause.
