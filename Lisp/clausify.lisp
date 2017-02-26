@@ -123,7 +123,7 @@
 (defun rew-exist (f &optional univars)
 	(cond
 		((null univars) 
-			(rew (substitute (skolem-variable) (second f) (third f))) univars)
+			(rew (substitute (skolem-variable) (second f) (third f)) univars))
 		(T (rew (subst (skolem-function univars) (second f) (third f)) univars))))
 
 
@@ -246,7 +246,8 @@
 			(not (eq (first f) (first (second f)))))
 		(append (list (first f)) 
 			(list (simplify (second f))) 
-			(list (simplify (third f)))))))
+			(list (simplify (third f)))))
+		(T f)))
 
 
 (defun is-literal (f)
