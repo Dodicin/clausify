@@ -4,33 +4,44 @@
 % --- CNF Converter
 %
 
-tocnf(FBF, FCNF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF),
-		     simplify(CNFFBF, FCNF), !.
-tocnf(FBF, CNFFBF) :- is_wff(FBF), rew(FBF, _, SFBF), dist(SFBF, CNFFBF), !.
-tocnf(FBF, FCNF) :- is_wff(FBF), rew(FBF, _, SFBF), simplify(SFBF, FCNF), !.
-tocnf(FBF, SFBF) :- is_wff(FBF), rew(FBF, _, SFBF), !.
+tocnf(FBF, FCNF) :- 
+	is_wff(FBF), 
+	rew(FBF, _, SFBF), 
+	dist(SFBF, CNFFBF),
+	simplify(CNFFBF, FCNF), !.
+tocnf(FBF, CNFFBF) :- 
+	is_wff(FBF), 
+	rew(FBF, _, SFBF), 
+	dist(SFBF, CNFFBF), !.
+tocnf(FBF, FCNF) :- 
+	is_wff(FBF),
+	rew(FBF, _, SFBF), 
+	simplify(SFBF, FCNF), !.
+tocnf(FBF, SFBF) :- 
+	is_wff(FBF), 
+	rew(FBF, _, SFBF), !.
 
 %
 % --- Horn check
 %
 
 is_horn(A) :- tocnf(A, B), is_horn_cnf(B), !.
-is_horn_cnf(A) :- A=..[and|Clauses], is_horn_disj(Clauses), !.
-is_horn_cnf(A) :- is_horn_disj(A), !.
+is_horn_cnf(A) :- A=..[and|Clauses], is_horn_conj(Clauses), !.
+is_horn_cnf(A) :- is_horn_conj(A), !.
 
-is_horn_disj([]) :- !.
-is_horn_disj([H|T]) :- is_horn_clause(H), is_horn_disj(T), !.
-is_horn_disj(Clause) :- is_horn_clause(Clause).
+is_horn_conj([]) :- !.
+is_horn_conj([H|T]) :- is_horn_clause(H), is_horn_conj(T), !.
+is_horn_conj(Clause) :- is_horn_clause(Clause).
 
 is_horn_clause(Clause) :- Clause=..[or|Literals], 
-			checkPos(Literals, N), N=<1, !.
-is_horn_clause(Term) :- is_term_or_neg(Term), 
-			checkPos([Term], N), N=<1, !.
+			positive_lit(Literals, N), N=<1, !.
+is_horn_clause(Term) :- is_literal(Term), 
+			positive_lit([Term], N), N=<1, !.
 
-checkPos([], 0).
-checkPos([H|T], N) :- functor(H, Name, _), Name \= not, !, 
-		         checkPos(T, N2), N is N2+1.
-checkPos([_|T], N) :- checkPos(T, N), !.
+positive_lit([], 0).
+positive_lit([H|T], N) :- functor(H, Name, _), Name \= not, !, 
+		         positive_lit(T, N2), N is N2+1.
+positive_lit([_|T], N) :- positive_lit(T, N), !.
 
 %
 % ---- Formula validity control
@@ -99,8 +110,9 @@ rew(A, _, A) :- !.
 % --- Distributivity law
 %
 
-dist(or(and(X, Y), Z), and(or(X, Z), or(Y, Z))).
-dist(or(Z, and(X, Y)), and(or(X, Z), or(Y, Z))).
+dist(or(and(X, Y), Z), and(or(X1, Z1), or(Y1, Z1))) :- dist(X, X1), dist(Y, Y1), dist(Z, Z1), !.
+dist(or(Z, and(X, Y)), and(or(X1, Z1), or(Y1, Z1))) :- dist(X, X1), dist(Y, Y1), dist(Z, Z1), !.
+dist(A, A) :- !.
 
 %
 % --- Binary conjunction and disjunction to n-ary
@@ -108,25 +120,25 @@ dist(or(Z, and(X, Y)), and(or(X, Z), or(Y, Z))).
 
 %% Case X(a, b) => X(a, b)
 simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]),
-		is_term_or_neg(Arg1), is_term_or_neg(Arg2), B = A, !.
+		is_literal(Arg1), is_literal(Arg2), B = A, !.
 
 %% Case X(X(a, b), c) => X(a, b, c)
 simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
-	   	Arg1=..[Name|_], is_term_or_neg(Arg2),
+	   	Arg1=..[Name|_], is_literal(Arg2),
 		simplify(Arg1, C), C=..[_|ArgsC], 
 		append(ArgsC, [Arg2], ArgsB),
 		B =.. [Name|ArgsB], !.
 
 %% Case X(a, X(b, c)) => X(a, b, c)
 simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
-	 	is_term_or_neg(Arg1), Arg2=..[Name|_], 
+	 	is_literal(Arg1), Arg2=..[Name|_], 
 		simplify(Arg2, C), C=..[_|ArgsC],
 		append([Arg1], ArgsC, ArgsB),
 		B =.. [Name|ArgsB], !.
 
 %% Case X(Y(a, b), c) => X(Y(a, b), c)
 simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
-	   	Arg1=..[DifferentName|_], is_term_or_neg(Arg2),
+	   	Arg1=..[DifferentName|_], is_literal(Arg2),
 		Name \== DifferentName, subset([DifferentName], [or, and]),
 		simplify(Arg1, C), 
 		append([C], [Arg2], ArgsB),
@@ -134,7 +146,7 @@ simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]),
 
 %% Case X(a, Y(b, c)) => X(a, Y(b, c))
 simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]), 
-	   	is_term_or_neg(Arg1), Arg2=..[DifferentName|_], 
+	   	is_literal(Arg1), Arg2=..[DifferentName|_], 
 	   	Name \== DifferentName, subset([DifferentName], [or, and]),
 		simplify(Arg2, C),
 		append([Arg1], [C], ArgsB),
@@ -176,7 +188,8 @@ simplify(A, B) :- 	A=..[Name, Arg1, Arg2], subset([Name], [or, and]),
 
 %% An argument isn't simplifiable with its parent 
 %% if it's a term or a negation of a term (A literal)
-is_term_or_neg(A) :- (is_term(A) ; A=..[not|_]), !. 
+is_literal(A) :- is_term(A), !.
+is_literal(A) :- A=..[not|B], is_term(B), !. 
 
 %
 % --- Generate skolem constants or functions
