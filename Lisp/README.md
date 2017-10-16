@@ -10,18 +10,18 @@ This Lisp library is a set of functions designed to parse first order logic (FOL
 
 The formulas in this project will be represented following this conventions:
 
-terms ::= <constant> | <variable> | <function>  
-constant ::= <number> | <symbols starting with a letter>  
-variable ::= <symbols starting with ?>  
-function ::= ’(’ <symbol> <terms>+ ’)’  
-wff ::= <predicate> | <negation> | <conjunction> | <disjunction> | <implication> | <universal> | <existential>  
-predicate ::= <symbol starting with a letter>| ’(’ <symbol> <terms>+ ’)’  
-negation ::= ’(’ not <wff> ’)’  
-conjunction ::= ’(’ and <wff> <wff> ’)’  
-disjunction ::= ’(’ or <wff> <wff> ’)’  
-implication ::= ’(’ implies <wff> <wff> ’)’  
-universal ::= ’(’ every <variable> <wff> ’)’  
-existential ::= ’(’ exist <variable> <wff> ’)’  
+>terms ::= <constant> | <variable> | <function>  
+>constant ::= <number> | <symbols starting with a letter>  
+>variable ::= <symbols starting with ?>  
+>function ::= ’(’ <symbol> <terms>+ ’)’  
+>wff ::= <predicate> | <negation> | <conjunction> | <disjunction> | <implication> | <universal> | <existential>  
+>predicate ::= <symbol starting with a letter>| ’(’ <symbol> <terms>+ ’)’  
+>negation ::= ’(’ not <wff> ’)’  
+>conjunction ::= ’(’ and <wff> <wff> ’)’  
+>disjunction ::= ’(’ or <wff> <wff> ’)’  
+>implication ::= ’(’ implies <wff> <wff> ’)’  
+>universal ::= ’(’ every <variable> <wff> ’)’  
+>existential ::= ’(’ exist <variable> <wff> ’)’  
 
 
 ## Usage
