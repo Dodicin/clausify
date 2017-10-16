@@ -1,12 +1,12 @@
 # clausify - Lisp
 
-# Author: Habbash Nassim (808292)
+#### Author: Habbash Nassim (808292)
 
-# Description
+## Description
 
 This Lisp library is a set of functions designed to parse first order logic (FOL) formulas, convert them into conjunctive normal form (CNF) and check whether a formula is a Horn clause.
 
-# Data structures
+## Data structures
 
 The formulas in this project will be represented following this conventions:
 
@@ -24,7 +24,7 @@ universal ::= ’(’ every <variable> <wff> ’)’
 existential ::= ’(’ exist <variable> <wff> ’)’
 
 
-# Usage
+## Usage
 
 The main functions are:
 
@@ -32,14 +32,14 @@ The main functions are:
 
 * (is-horn f). True if f is a horn clause. That is, if f is a disjunction of literals with at most one positive. f could also be a conjunction of horn clauses: in that case, is_horn is true if every clause is a horn clause.
 
-# Functionalities
+## Functionalities
 
 Every function required in the project has been implemented.
 Every function is recursive: a formula may well be seen as a tree. It's necessary for the functions to work at every level of depth of the tree to successfully compute any operation on the formula.
 
-# Functions specifications
+## Functions specifications
 
-## Formula validity control
+### Formula validity control
 
 * 'termp'. Syntax: termp term => generalized-boolean.
 Returns true if term is either a constant, a variable or a function. Note: the keywords (and or not implies every exist) are protected and can't be used as name of a constant or variable.
@@ -52,7 +52,7 @@ Returns true if formula is a well-formed formula. That is, inductively:
 	*** Note: The binary operators accepted by this library are: [and, or, not, implies, every, exist].
 With such definition, only unary and binary operators are allowed in input. This function is recursive.
 
-## Rewrite rules
+### Rewrite rules
 
 * 'rew'. Syntax: rew formula &optional univars => conjunctive-normal-form-formula. 
 rew is a set of functions implementing conversion rules from formula (generic FOL formula) to conjunctive-normal-form-formula (CNF of the formula). Said rules are:
@@ -67,7 +67,7 @@ univars is utilized to store universal quantifiers encountered in a formula or s
 * 'dist'. Syntax: dist formula => distributed-formula.
 This function implements the distribution law on formula.
 
-## Simplification
+### Simplification
 
 * 'simplify'. Syntax: simplify formula => simplified-formula.
 This is a set of functions used to simplify binary operators to n-ary operators. Operator associativity in this project is defined on only conjunctions and disjunctions, but the function may be used to simplify whatever function with its arguments if necessary, editing the binding to the (and or) operators.
@@ -75,6 +75,6 @@ This is a set of functions used to simplify binary operators to n-ary operators.
 * 'is-literal'. Syntax: is-literal literal => generalized-boolean.
 Returns true if literal is a literal. A literal is a term or the negation of said term. It's used for the simplification: it's not possible to simplify a literal.
 
-## Skolem generation
+### Skolem generation
 
 * 'skolem_function'.  Syntax: is-literal literal => generalized-boolean. is a set of three functions (including 'skolem_variable') responsable for generating either skolem constants or skolem functions. It relies on whether ?univars is a list of variables or a single variable to determs if the parser/converter ('rew') is parsing a free existential quantifier (replacing it with a skolem constants) or an existential quantifier depending on a universally quantified variable (replacing it with a skolem function)
